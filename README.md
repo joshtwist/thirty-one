@@ -103,6 +103,19 @@ First-time setup:
 pnpm wrangler login
 ```
 
+### Automatic deploys
+
+`.github/workflows/deploy.yml` deploys on every push to `main`. It
+also exposes a `workflow_dispatch` trigger so you can deploy any
+branch manually from the Actions tab.
+
+To enable it, add one repo secret:
+
+- `CLOUDFLARE_API_TOKEN` — create at Cloudflare dashboard → My Profile
+  → API Tokens → **Edit Cloudflare Workers** template. That scoped
+  token can deploy Workers and Durable Objects without needing full
+  account access.
+
 ## Project layout
 
 ```
