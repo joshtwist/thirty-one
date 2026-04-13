@@ -109,12 +109,17 @@ pnpm wrangler login
 also exposes a `workflow_dispatch` trigger so you can deploy any
 branch manually from the Actions tab.
 
-To enable it, add one repo secret:
+To enable it, add two repo secrets under Settings → Secrets and
+variables → Actions:
 
 - `CLOUDFLARE_API_TOKEN` — create at Cloudflare dashboard → My Profile
-  → API Tokens → **Edit Cloudflare Workers** template. That scoped
-  token can deploy Workers and Durable Objects without needing full
-  account access.
+  → API Tokens → **Create Token** → use the **Edit Cloudflare Workers**
+  template → optionally narrow the Account Resources to just this
+  account → Continue → Create. That scoped token covers Workers,
+  Durable Objects, and static assets.
+- `CLOUDFLARE_ACCOUNT_ID` — shown on the right column of any
+  Workers & Pages page in the dashboard, or at the bottom of the
+  account home page.
 
 ## Project layout
 

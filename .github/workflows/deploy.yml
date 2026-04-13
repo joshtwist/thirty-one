@@ -8,6 +8,10 @@ name: Deploy
 #     → API Tokens → "Edit Cloudflare Workers" template. The scoped
 #     token can read + deploy Workers and Durable Objects for your
 #     account; no extra permissions needed.
+#   CLOUDFLARE_ACCOUNT_ID — found on the right side of any Cloudflare
+#     dashboard page (Workers & Pages → Overview shows it). Technically
+#     optional if the token is already scoped to a single account, but
+#     setting it explicitly avoids ambiguity.
 
 on:
   push:
@@ -58,6 +62,7 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # No `command:` needed — the action runs `wrangler deploy`
           # by default, which picks up wrangler.toml (Worker + DO
           # migration + static assets binding all in one shot).
