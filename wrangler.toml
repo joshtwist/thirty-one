@@ -1,4 +1,4 @@
-name = "rummy"
+name = "thirty-one"
 main = "src/server/index.ts"
 compatibility_date = "2025-04-01"
 
