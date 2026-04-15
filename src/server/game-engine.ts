@@ -1,11 +1,10 @@
 import type {
   Card,
-  GameMode,
   GamePhase,
   TurnPhase,
   PlayerIcon,
 } from "../shared/types.ts";
-import { MAX_PLAYERS } from "../shared/types.ts";
+import { HAND_SIZE, MAX_PLAYERS } from "../shared/types.ts";
 import type {
   StateMessage,
   DealingMessage,
@@ -13,7 +12,6 @@ import type {
   SelfView,
 } from "../shared/protocol.ts";
 import { createDeck, shuffle, deal, scoreHand } from "./deck.ts";
-import { canMeldHand } from "./melds.ts";
 
 // ── State types ────────────────────────────────────────────────────
 
@@ -33,7 +31,6 @@ export interface RematchInfo {
 export interface GameState {
   gameId: string;
   phase: GamePhase;
-  mode: GameMode | null;
   players: Player[];
   deck: Card[];
   discardPile: Card[];
@@ -41,6 +38,13 @@ export interface GameState {
   currentPlayerIndex: number;
   turnPhase: TurnPhase;
   creatorId: string;
+  /**
+   * The player who pressed "Stop the Bus", committing to their current
+   * hand. Once set, every OTHER player takes one more normal turn; when
+   * the turn rotation would return to this player, the game transitions
+   * to "complete". Null before any stop has been called.
+   */
+  stoppedByPlayerId: string | null;
   /**
    * Set after the game completes when someone opens a rematch. Other
    * players see this and can choose to hop into the new game at their
@@ -56,10 +60,9 @@ export interface GameState {
    */
   celebrationGif: string | null;
   /**
-   * The player who completed their hand. Recorded at the moment the
-   * game transitions to "complete"; before that it's null. Stored so
-   * the win screen has a stable answer for "who won" without relying
-   * on a hand-emptiness heuristic (Rummy wins keep cards in hand).
+   * The player with the highest scoring hand at game end. Computed
+   * once at the transition to "complete" (see `finaliseGame`) and
+   * frozen from that point on.
    */
   winnerId: string | null;
 }
@@ -80,6 +83,47 @@ function assertPlayer(state: GameState, playerId: string): void {
   }
 }
 
+/**
+ * Pick a winner given the current hands + who (if anyone) stopped the
+ * bus. Highest score wins. Ties go to the non-stopper; further ties are
+ * broken by earliest position in the player list (standard deterministic
+ * tiebreak).
+ */
+function pickWinner(state: GameState): string {
+  let bestId = state.players[0].playerId;
+  let bestScore = scoreHand(state.hands[bestId] ?? []);
+
+  for (let i = 1; i < state.players.length; i++) {
+    const pid = state.players[i].playerId;
+    const score = scoreHand(state.hands[pid] ?? []);
+
+    if (score > bestScore) {
+      bestId = pid;
+      bestScore = score;
+      continue;
+    }
+    if (score === bestScore) {
+      // Tiebreak: the stopper loses ties (they committed to their hand).
+      if (bestId === state.stoppedByPlayerId) {
+        bestId = pid;
+        bestScore = score;
+      }
+      // Otherwise keep the earlier player (bestId unchanged).
+    }
+  }
+
+  return bestId;
+}
+
+function finaliseGame(state: GameState): GameState {
+  const winnerId = pickWinner(state);
+  return {
+    ...state,
+    phase: "complete",
+    winnerId,
+  };
+}
+
 // ── Public API (all pure) ──────────────────────────────────────────
 
 /** Create a fresh game in lobby phase. No creator yet -- they join like everyone else. */
@@ -87,7 +131,6 @@ export function createGame(gameId: string): GameState {
   return {
     gameId,
     phase: "lobby",
-    mode: null,
     players: [],
     deck: [],
     discardPile: [],
@@ -95,6 +138,7 @@ export function createGame(gameId: string): GameState {
     currentPlayerIndex: 0,
     turnPhase: "draw",
     creatorId: "",
+    stoppedByPlayerId: null,
     rematch: null,
     celebrationGif: null,
     winnerId: null,
@@ -150,13 +194,12 @@ export function removePlayer(
 
 /**
  * Start the game. Only the creator may call this.
- * Shuffles the deck, deals cards, flips the first discard.
+ * Shuffles the deck, deals 3 cards per player, flips the first discard.
  * Sets phase to "dealing" -- the DO will transition to "playing" after a delay.
  */
 export function startGame(
   state: GameState,
   playerId: string,
-  mode: GameMode,
 ): GameState {
   if (state.phase !== "lobby") {
     throw new Error("Game has already started");
@@ -170,7 +213,7 @@ export function startGame(
 
   const shuffled = shuffle(createDeck());
   const playerIds = state.players.map((p) => p.playerId);
-  const { hands, remaining } = deal(shuffled, playerIds, mode);
+  const { hands, remaining } = deal(shuffled, playerIds, HAND_SIZE);
 
   // Flip the top card of the remaining deck onto the discard pile
   const firstDiscard = remaining.shift()!;
@@ -178,7 +221,6 @@ export function startGame(
   return {
     ...state,
     phase: "dealing",
-    mode,
     deck: remaining,
     discardPile: [firstDiscard],
     hands,
@@ -243,10 +285,10 @@ export function drawCard(
 }
 
 /**
- * Active player discards a card from their hand. Either transitions the
- * game to "complete" (if the remaining hand can be fully partitioned
- * into valid Rummy melds) or advances to the next player in "draw"
- * phase.
+ * Active player discards a card from their hand. Advances to the next
+ * player in "draw" phase — unless someone has already stopped the bus
+ * and the next player would be that stopper, in which case the game
+ * transitions to "complete" with the highest-scoring hand as winner.
  */
 export function discardCard(
   state: GameState,
@@ -272,27 +314,61 @@ export function discardCard(
 
   const newHand = [...hand.slice(0, idx), ...hand.slice(idx + 1)];
   const newDiscardPile = [...state.discardPile, card];
+  const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
 
-  // Win condition (Rummy): the remaining hand can be fully partitioned
-  // into valid melds (sets or runs). The discard itself is the card
-  // that "completes" the hand — everything left must be meldable.
-  if (canMeldHand(newHand)) {
-    return {
-      ...state,
-      hands: { ...state.hands, [playerId]: newHand },
-      discardPile: newDiscardPile,
-      phase: "complete",
-      winnerId: playerId,
-    };
+  const base: GameState = {
+    ...state,
+    hands: { ...state.hands, [playerId]: newHand },
+    discardPile: newDiscardPile,
+    currentPlayerIndex: nextIndex,
+    turnPhase: "draw",
+  };
+
+  // If a stopper is waiting and the next turn would return to them,
+  // the game is over. Everyone has had their last turn; compute scores.
+  if (
+    state.stoppedByPlayerId != null &&
+    state.players[nextIndex].playerId === state.stoppedByPlayerId
+  ) {
+    return finaliseGame(base);
   }
 
-  // Advance to next player
+  return base;
+}
+
+/**
+ * Active player presses "Stop the Bus" during the draw phase — they
+ * commit to their current 3-card hand. Their turn ends (no draw, no
+ * discard). Play advances to the next player; each other player takes
+ * one normal turn, and the game ends when the rotation would return to
+ * the stopper.
+ *
+ * Only one stop is allowed per game — calling this a second time
+ * throws.
+ */
+export function stopTheBus(
+  state: GameState,
+  playerId: string,
+): GameState {
+  if (state.phase !== "playing") {
+    throw new Error("Cannot stop the bus: the game is not in progress");
+  }
+  if (state.turnPhase !== "draw") {
+    throw new Error("You can only stop the bus at the start of your turn");
+  }
+  const currentPlayer = state.players[state.currentPlayerIndex];
+  if (currentPlayer.playerId !== playerId) {
+    throw new Error("It is not your turn");
+  }
+  if (state.stoppedByPlayerId != null) {
+    throw new Error("Someone has already stopped the bus");
+  }
+
   const nextIndex = (state.currentPlayerIndex + 1) % state.players.length;
 
   return {
     ...state,
-    hands: { ...state.hands, [playerId]: newHand },
-    discardPile: newDiscardPile,
+    stoppedByPlayerId: playerId,
     currentPlayerIndex: nextIndex,
     turnPhase: "draw",
   };
@@ -372,13 +448,13 @@ export function getPlayerView(
   return {
     type: "state",
     phase: state.phase,
-    mode: state.mode,
     turnPhase: state.phase === "playing" ? state.turnPhase : null,
     you,
     players,
     currentPlayerId,
     discardTop,
     deckCount: state.deck.length,
+    stoppedByPlayerId: state.stoppedByPlayerId,
     rematch: state.rematch,
   };
 }
@@ -388,10 +464,6 @@ export function getDealingView(
   state: GameState,
   playerId: string,
 ): DealingMessage {
-  if (state.mode === null) {
-    throw new Error("Game mode is not set");
-  }
-
   const discardTop =
     state.discardPile.length > 0
       ? state.discardPile[state.discardPile.length - 1]
@@ -403,7 +475,6 @@ export function getDealingView(
 
   return {
     type: "dealing",
-    mode: state.mode,
     playerOrder: state.players.map((p) => p.playerId),
     hand: state.hands[playerId] ?? [],
     discardTop,
@@ -412,14 +483,14 @@ export function getDealingView(
 }
 
 /**
- * Build the game-complete result including scores.
- * The winner is recorded on state at the moment the hand goes Rummy
- * (see discardCard); we just look it up here. Other players' final
- * hands are sent so everyone can see how close they were.
+ * Build the game-complete result including scores. The winner is stored
+ * on state by `finaliseGame`; we just build the per-player breakdown.
+ * Hands are included so everyone can see the final cards.
  */
 export function getGameCompleteResult(state: GameState): {
   winnerId: string;
   winnerName: string;
+  stoppedByPlayerId: string | null;
   scores: {
     playerId: string;
     name: string;
@@ -439,22 +510,22 @@ export function getGameCompleteResult(state: GameState): {
     playerId: p.playerId,
     name: p.name,
     icon: p.icon,
-    // Winner scores 0 (they went Rummy). Others tally remaining cards.
-    score:
-      p.playerId === winner.playerId ? 0 : scoreHand(state.hands[p.playerId] ?? []),
+    score: scoreHand(state.hands[p.playerId] ?? []),
     hand: state.hands[p.playerId] ?? [],
   }));
 
-  // Sort: winner first, then by ascending score (lower = closer to winning)
+  // Sort: winner first, then everyone else by descending score (higher is
+  // better in Thirty-One).
   scores.sort((a, b) => {
     if (a.playerId === winner.playerId) return -1;
     if (b.playerId === winner.playerId) return 1;
-    return a.score - b.score;
+    return b.score - a.score;
   });
 
   return {
     winnerId: winner.playerId,
     winnerName: winner.name,
+    stoppedByPlayerId: state.stoppedByPlayerId,
     scores,
   };
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { DealingMessage, StateMessage } from "../../shared/protocol.ts";
+import { HAND_SIZE } from "../../shared/types.ts";
 import { Card } from "./Card.tsx";
 import { ICON_MAP, ICON_COLORS } from "../lib/icons.ts";
 
@@ -20,7 +21,7 @@ interface DealAnimationProps {
 export function DealAnimation({ dealing, state }: DealAnimationProps) {
   const [dealtCount, setDealtCount] = useState(0);
   const numPlayers = dealing.playerOrder.length;
-  const totalCards = numPlayers * dealing.mode;
+  const totalCards = numPlayers * HAND_SIZE;
   const dealIntervalMs = Math.max(2500 / totalCards, 50);
 
   useEffect(() => {

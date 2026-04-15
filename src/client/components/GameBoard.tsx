@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Hand } from "lucide-react";
 import type { StateMessage, ClientMessage } from "../../shared/protocol.ts";
 import type { Card as CardType } from "../../shared/types.ts";
 import { vibrateAction } from "../lib/haptics.ts";
@@ -19,24 +20,38 @@ interface GameBoardProps {
  *   1. Opponents bar
  *   2. "Your Turn" / "Waiting for ..." pill
  *   3. Centre area (deck + discard)
- *   4. Instruction line
+ *   4. Instruction line + optional "Stop the Bus" button
  *   5. Your hand (drag any card; drop on discard during your turn)
- *   6. Footer: your avatar + card count + score
+ *   6. Footer: your avatar + card count
  *
  * The GameBoard owns the shared `discardRef` + drag state so PlayerHand and
  * CenterArea coordinate (the discard pile lights up while a card is being
  * dragged).
  */
 export function GameBoard({ state, send }: GameBoardProps) {
-  const { you, players, currentPlayerId, turnPhase, discardTop, deckCount } =
-    state;
+  const {
+    you,
+    players,
+    currentPlayerId,
+    turnPhase,
+    discardTop,
+    deckCount,
+    stoppedByPlayerId,
+  } = state;
 
   const isMyTurn = currentPlayerId === you.playerId;
   const canDraw = isMyTurn && turnPhase === "draw";
   const canDiscard = isMyTurn && turnPhase === "discard";
+  // You can stop the bus at the start of your turn (draw phase), only
+  // if nobody else has stopped yet.
+  const canStopTheBus = canDraw && stoppedByPlayerId == null;
 
   const activePlayer = players.find((p) => p.playerId === currentPlayerId);
   const activeName = activePlayer?.name ?? "";
+
+  const stopper = stoppedByPlayerId
+    ? players.find((p) => p.playerId === stoppedByPlayerId)
+    : null;
 
   // Self colour index from the canonical players list (so opponent + footer agree)
   const selfIndex = players.findIndex((p) => p.playerId === you.playerId);
@@ -70,15 +85,21 @@ export function GameBoard({ state, send }: GameBoardProps) {
     if (canDiscard) send({ type: "discard", card });
   }
 
+  function handleStopTheBus() {
+    if (canStopTheBus) send({ type: "stop_the_bus" });
+  }
+
   // Status pill text
   const statusText = isMyTurn ? "Your Turn" : `${activeName}'s turn`;
 
   // Instruction line (smaller, contextual)
   let instruction: string | null = null;
   if (isMyTurn && turnPhase === "draw") {
-    instruction = "Draw from deck or pick up discard";
+    instruction = "Draw a card or Stop the Bus";
   } else if (isMyTurn && turnPhase === "discard") {
     instruction = "Drag a card to the discard pile";
+  } else if (stopper) {
+    instruction = `${stopper.name} stopped the bus — last round!`;
   }
 
   return (
@@ -89,6 +110,7 @@ export function GameBoard({ state, send }: GameBoardProps) {
           players={players}
           currentPlayerId={currentPlayerId}
           selfId={you.playerId}
+          stoppedByPlayerId={stoppedByPlayerId}
         />
       </div>
 
@@ -124,6 +146,19 @@ export function GameBoard({ state, send }: GameBoardProps) {
         <div className="h-5 mt-3 text-xs text-slate-400/90 text-center px-4">
           {instruction ?? ""}
         </div>
+
+        {/* Stop the Bus button — visible only on your turn, draw phase,
+            and only if nobody has already stopped. */}
+        {canStopTheBus && (
+          <button
+            data-testid="stop-bus-btn"
+            onClick={handleStopTheBus}
+            className="mt-3 px-5 py-2 rounded-full bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-bold shadow-md transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            <Hand className="w-4 h-4" />
+            Stop the Bus
+          </button>
+        )}
       </div>
 
       {/* 5. Your hand */}
@@ -138,7 +173,7 @@ export function GameBoard({ state, send }: GameBoardProps) {
         />
       </div>
 
-      {/* 6. Footer: self badge + score */}
+      {/* 6. Footer: self badge */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 border-t border-white/5">
         <div className="flex items-center gap-2">
           <div
@@ -153,9 +188,13 @@ export function GameBoard({ state, send }: GameBoardProps) {
             </div>
           </div>
         </div>
-        <div className="text-xs px-3 py-1 rounded-full bg-slate-800/60 text-slate-300">
-          Score: 0
-        </div>
+        {stopper && (
+          <div className="text-xs px-3 py-1 rounded-full bg-red-600/80 text-white font-semibold">
+            {stopper.playerId === you.playerId
+              ? "You stopped the bus"
+              : `${stopper.name} stopped`}
+          </div>
+        )}
       </div>
     </div>
   );

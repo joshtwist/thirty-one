@@ -24,12 +24,12 @@ export function ShareButton({
   async function handleShare() {
     // Prefer the native share sheet on mobile (Safari/Chrome).
     // We only send title + url -- no `text` field, so messaging apps don't
-    // prepend "Come play Rummy with me" to the URL (which can confuse the
-    // recipient if they end up copy-pasting it).
+    // prepend extra copy to the URL (which can confuse the recipient if
+    // they end up copy-pasting it).
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Join my Rummy game!",
+          title: "Join my Thirty-One game!",
           url,
         });
         return;

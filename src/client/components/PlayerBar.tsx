@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Hand } from "lucide-react";
 import type { PlayerView } from "../../shared/protocol.ts";
 import { ICON_MAP, ICON_COLORS } from "../lib/icons.ts";
 
@@ -6,6 +7,8 @@ interface PlayerBarProps {
   players: PlayerView[];
   currentPlayerId: string | null;
   selfId: string;
+  /** If set, show a "stopped" badge on this player's avatar. */
+  stoppedByPlayerId: string | null;
 }
 
 /**
@@ -23,6 +26,7 @@ export function PlayerBar({
   players,
   currentPlayerId,
   selfId,
+  stoppedByPlayerId,
 }: PlayerBarProps) {
   const opponents = players
     .map((p, i) => ({ player: p, colorIndex: i }))
@@ -41,6 +45,7 @@ export function PlayerBar({
         const Icon = ICON_MAP[player.icon];
         const color = ICON_COLORS[colorIndex % ICON_COLORS.length];
         const isActive = currentPlayerId === player.playerId;
+        const isStopper = stoppedByPlayerId === player.playerId;
 
         return (
           <div
@@ -67,6 +72,14 @@ export function PlayerBar({
               >
                 <Icon className="w-6 h-6 text-white" />
               </div>
+              {isStopper && (
+                <div
+                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-red-600 border-2 border-felt flex items-center justify-center"
+                  title="Stopped the bus"
+                >
+                  <Hand className="w-2.5 h-2.5 text-white" />
+                </div>
+              )}
             </div>
             <span
               className={`text-xs font-medium max-w-[70px] truncate leading-tight ${

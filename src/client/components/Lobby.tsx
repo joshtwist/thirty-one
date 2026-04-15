@@ -1,8 +1,6 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
 import { Users, Play } from "lucide-react";
 import type { StateMessage, ClientMessage } from "../../shared/protocol.ts";
-import type { GameMode } from "../../shared/types.ts";
 import { MAX_PLAYERS } from "../../shared/types.ts";
 import { ICON_MAP, ICON_COLORS } from "../lib/icons.ts";
 import { ShareButton } from "./ShareButton.tsx";
@@ -14,13 +12,12 @@ interface LobbyProps {
 }
 
 export function Lobby({ state, gameId, send }: LobbyProps) {
-  const [mode, setMode] = useState<GameMode>(10);
   const { you, players } = state;
   const canStart = players.length >= 2;
 
   function handleStart() {
     if (!canStart) return;
-    send({ type: "start_game", mode });
+    send({ type: "start_game" });
   }
 
   return (
@@ -103,29 +100,7 @@ export function Lobby({ state, gameId, send }: LobbyProps) {
 
       {/* Host controls */}
       {you.isCreator ? (
-        <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4 flex flex-col gap-4">
-          <div>
-            <label className="text-sm font-medium text-slate-300 block mb-2">
-              Game Mode
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {([7, 10] as GameMode[]).map((m) => (
-                <button
-                  key={m}
-                  data-testid={`mode-${m}`}
-                  onClick={() => setMode(m)}
-                  className={`py-3 px-4 rounded-xl font-semibold text-center transition-all duration-200 cursor-pointer ${
-                    mode === m
-                      ? "bg-gold text-slate-900 shadow-md"
-                      : "bg-slate-900 text-slate-300 hover:bg-slate-700"
-                  }`}
-                >
-                  {m} cards
-                </button>
-              ))}
-            </div>
-          </div>
-
+        <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
           <button
             data-testid="start-game-btn"
             onClick={handleStart}

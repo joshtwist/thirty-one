@@ -8,6 +8,7 @@ import {
   startGame,
   drawCard,
   discardCard,
+  stopTheBus,
   createRematch,
   getPlayerView,
   getDealingView,
@@ -138,6 +139,7 @@ export class GameRoom extends DurableObject<Env> {
       type: "game_complete",
       winnerId: result.winnerId,
       winnerName: result.winnerName,
+      stoppedByPlayerId: result.stoppedByPlayerId,
       scores: result.scores,
       celebrationGif: state.celebrationGif,
     };
@@ -296,7 +298,7 @@ export class GameRoom extends DurableObject<Env> {
         return;
 
       case "start_game":
-        await this.handleStartGame(ws, msg.mode);
+        await this.handleStartGame(ws);
         return;
 
       case "draw":
@@ -305,6 +307,10 @@ export class GameRoom extends DurableObject<Env> {
 
       case "discard":
         await this.handleDiscard(ws, msg.card);
+        return;
+
+      case "stop_the_bus":
+        await this.handleStopTheBus(ws);
         return;
 
       case "create_rematch":
@@ -367,10 +373,7 @@ export class GameRoom extends DurableObject<Env> {
     this.broadcastToAll({ type: "player_reconnected", playerId });
   }
 
-  private async handleStartGame(
-    ws: WebSocket,
-    mode: 7 | 10,
-  ): Promise<void> {
+  private async handleStartGame(ws: WebSocket): Promise<void> {
     const playerId = this.getPlayerIdFromSocket(ws);
     if (!playerId) {
       this.send(ws, { type: "error", message: "Not identified" });
@@ -378,7 +381,7 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     let state = await this.loadState();
-    state = startGame(state, playerId, mode);
+    state = startGame(state, playerId);
     await this.saveState(state);
 
     // Broadcast state (phase: "dealing") first so clients switch UI.
@@ -434,6 +437,25 @@ export class GameRoom extends DurableObject<Env> {
   }
 
   /**
+   * Player pressed "Stop the Bus". Their turn ends; play rotates to the
+   * next player. The stop is recorded on state, and when the rotation
+   * returns to this player (via a future discardCard call), the game
+   * transitions to "complete".
+   */
+  private async handleStopTheBus(ws: WebSocket): Promise<void> {
+    const playerId = this.getPlayerIdFromSocket(ws);
+    if (!playerId) {
+      this.send(ws, { type: "error", message: "Not identified" });
+      return;
+    }
+
+    let state = await this.loadState();
+    state = stopTheBus(state, playerId);
+    await this.saveState(state);
+    this.broadcastState(state);
+  }
+
+  /**
    * Player opened a rematch from the win screen. We:
    *   1. Generate a new gameId and attach it to the completed state.
    *   2. Broadcast updated state to all connected clients so they
@@ -462,8 +484,8 @@ export class GameRoom extends DurableObject<Env> {
 
   /**
    * Test-only hook. Replaces a player's hand with the supplied cards.
-   * Used by the e2e suite to set up "one discard away from Rummy"
-   * scenarios deterministically instead of shuffle-gambling for them.
+   * Used by the e2e suite to set up specific 3-card hands (e.g. a
+   * perfect 31) deterministically instead of shuffle-gambling for them.
    * Ignored unless TEST_HOOKS is explicitly enabled in the worker env.
    */
   private async handleTestForceHand(

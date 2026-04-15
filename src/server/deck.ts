@@ -74,16 +74,22 @@ export function deal(
   return { hands, remaining };
 }
 
-/** Returns the point value of a single card. */
-export function cardScore(card: Card): number {
-  return CARD_VALUES[card.rank];
-}
-
-/** Sums the point values of all cards in a hand. */
+/**
+ * Thirty-One hand score: the MAX sum over any single suit.
+ *
+ *   A♥ K♥ 2♣ → hearts=21, clubs=2 → 21
+ *   A♠ K♠ Q♠ → spades=31 → 31
+ *   7♥ 8♣ 9♦ → 9 (each suit has one card; pick the highest)
+ */
 export function scoreHand(hand: Card[]): number {
-  let total = 0;
+  const totals: Record<Suit, number> = {
+    hearts: 0,
+    diamonds: 0,
+    clubs: 0,
+    spades: 0,
+  };
   for (const card of hand) {
-    total += CARD_VALUES[card.rank];
+    totals[card.suit] += CARD_VALUES[card.rank];
   }
-  return total;
+  return Math.max(totals.hearts, totals.diamonds, totals.clubs, totals.spades);
 }

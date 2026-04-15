@@ -18,7 +18,6 @@ test.describe("Visual capture", () => {
       await page2.goto(gameUrl);
       await joinAs(page2, "Bob", "dog");
 
-      await page1.getByTestId("mode-10").click();
       await page1.getByTestId("start-game-btn").click();
 
       await page1

@@ -78,6 +78,14 @@ export async function playTurn(activePage: Page): Promise<void> {
   await dragFirstCardToDiscard(activePage);
 }
 
+/**
+ * Start a Thirty-One game from the lobby. Assumes both players are
+ * already joined and ready. Just clicks the single Start button.
+ */
+export async function startGameFromLobby(hostPage: Page): Promise<void> {
+  await hostPage.getByTestId("start-game-btn").click();
+}
+
 /** Count cards in a player's hand. */
 export async function handSize(page: Page): Promise<number> {
   return page.locator('[data-testid^="hand-card-"]').count();

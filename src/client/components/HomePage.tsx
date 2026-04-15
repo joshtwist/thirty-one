@@ -27,7 +27,7 @@ export function HomePage() {
           <div className="w-20 h-20 rounded-2xl bg-felt flex items-center justify-center shadow-lg">
             <Spade className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-4xl font-bold tracking-tight">Rummy</h1>
+          <h1 className="text-4xl font-bold tracking-tight">Thirty-One</h1>
           <p className="text-slate-400 text-center text-lg">
             No accounts. No installs. Just share a link and play.
           </p>
@@ -60,7 +60,7 @@ export function HomePage() {
           </button>
 
           <p className="text-slate-500 text-sm text-center">
-            2-4 players. Pick 7 or 10 card mode.
+            2-4 players. Three cards each. Score the highest single-suit total.
           </p>
         </div>
       </div>

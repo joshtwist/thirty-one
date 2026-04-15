@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Sparkles, LogIn } from "lucide-react";
+import { Trophy, Sparkles, LogIn, Hand } from "lucide-react";
 import type {
   GameCompleteMessage,
   StateMessage,
@@ -45,6 +45,10 @@ export function GameComplete({
   const rematch = state.rematch;
   const amCreator = rematch?.creatorId === state.you.playerId;
 
+  const winnerScore =
+    result.scores.find((s) => s.playerId === result.winnerId)?.score ?? 0;
+  const isPerfect = winnerScore === 31;
+
   // If I created the rematch, jump me over automatically. Non-creators
   // get a button; they decide when to move.
   const autoJumpedRef = useRef(false);
@@ -80,7 +84,9 @@ export function GameComplete({
         <h1 className="text-4xl font-bold text-center" data-testid="winner-banner">
           {isWinner ? "You Won!" : `${result.winnerName} Wins!`}
         </h1>
-        <p className="text-slate-400 text-sm">Rummy!</p>
+        <p className="text-slate-400 text-sm">
+          {isPerfect ? "Thirty-One! Perfect hand." : `with ${winnerScore} points`}
+        </p>
       </motion.div>
 
       {/* Celebration GIF */}
@@ -116,6 +122,7 @@ export function GameComplete({
                 (colorIndex >= 0 ? colorIndex : i) % ICON_COLORS.length
               ];
             const isWinnerRow = score.playerId === result.winnerId;
+            const isStopper = score.playerId === result.stoppedByPlayerId;
 
             return (
               <div
@@ -139,11 +146,18 @@ export function GameComplete({
                       {isWinnerRow && (
                         <Sparkles className="w-4 h-4 text-gold" />
                       )}
+                      {isStopper && (
+                        <span
+                          title="Stopped the bus"
+                          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-red-600/80 text-white font-semibold"
+                        >
+                          <Hand className="w-3 h-3" />
+                          stopped
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-slate-400">
-                      {isWinnerRow
-                        ? "Went Rummy"
-                        : `${score.score} points in hand`}
+                      {score.score} points
                     </div>
                   </div>
                 </div>

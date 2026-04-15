@@ -1,7 +1,8 @@
-# Rummy
+# Thirty-One
 
-Multiplayer Rummy card game. Real-time, 2–4 players, runs entirely on
-Cloudflare Workers + Durable Objects.
+Multiplayer Thirty-One card game (a.k.a. Scat, Blitz, Ride the Bus).
+Real-time, 2–4 players, runs entirely on Cloudflare Workers + Durable
+Objects.
 
 ## Stack
 
@@ -18,16 +19,24 @@ game API. No separate frontend host.
 
 ## How the game works
 
-- **Modes** — 7-card (fast) or 10-card (classic). First player to
-  arrange their entire hand into valid Rummy melds and discard one card
-  wins.
-- **Melds** — Sets (3–4 same rank, different suits) or runs (3+
-  consecutive same suit, Aces low). Win detection does a backtracking
-  partition so overlapping meld options don't trip it up.
-- **State machine** — `lobby → dealing → playing → complete`. A
-  completed game becomes a pointer to the rematch lobby: the winner
-  clicks "Create New Game" and other players see a "Join X's New Game"
-  button at their leisure.
+Each player is dealt **3 cards**. On your turn you either draw from the
+deck or the discard pile, then discard one card — exactly like Rummy.
+
+### Scoring
+
+A hand is scored as the **max sum over any single suit**:
+
+- Ace = 11, face cards = 10, others face value
+- `A♠ K♠ Q♠` → spades = 31 (a perfect hand — "Thirty-One")
+- `A♥ K♥ 2♣` → hearts = 21, clubs = 2 → score 21
+
+### Stop the Bus
+
+At the start of your turn (draw phase), press **Stop the Bus** to
+commit to your current hand. You skip drawing/discarding for this
+turn. Every other player gets one more normal turn, and when the turn
+rotation would come back to you, the game ends and scores are
+revealed. Highest score wins; ties go against the stopper.
 
 ## Local development
 
@@ -49,8 +58,8 @@ TEST_HOOKS=1
 ```
 
 This gates a server-side `_test_force_hand` WebSocket message that the
-Playwright suite uses to deal a known winning hand. With `TEST_HOOKS`
-unset (i.e. production), the hook is inert.
+Playwright suite uses to deal a known hand (e.g. a perfect 31). With
+`TEST_HOOKS` unset (i.e. production), the hook is inert.
 
 ### Useful scripts
 
@@ -75,8 +84,9 @@ file that's gitignored.
 pnpm test
 ```
 
-Covers the full game loop end-to-end: create room, join, start, draw,
-discard, reconnect under WebSocket drops, force a winning hand, see
+Covers the full game loop end-to-end: create room, join, start, deal,
+draw, discard, reconnect under WebSocket drops, force a perfect-31
+hand, press Stop the Bus, second player takes their final turn, see
 the GameComplete screen on both clients, create a rematch, join it
 from the other client.
 
@@ -127,14 +137,13 @@ variables → Actions:
 src/
   client/              React SPA
     components/        Game UI (PlayerHand, GameComplete, etc.)
-    hooks/             useWebSocket
+    hooks/             useWebSocket, useGameState
     lib/               icons, haptics, storage, celebrations
   server/
     index.ts           Worker entry — routes /api/* to the DO
     game-room.ts       GameRoom DO (state + WS broker)
     game-engine.ts     Pure game state reducers
     deck.ts            Deck, shuffle, deal, scoring
-    melds.ts           Set/run detection + hand partition
   shared/              Types + wire protocol shared by client & server
 
 e2e/                   Playwright specs and helpers
@@ -142,7 +151,8 @@ wrangler.toml          Worker + DO + assets binding
 ```
 
 Server state is pure: `game-engine.ts` exports reducer-shaped functions
-(`addPlayer`, `drawCard`, `discardCard`, ...) that take a `GameState`
-and return the next one. The DO owns the only mutable instance and
-handles WebSockets + persistence. This makes the engine trivially
-unit-testable and keeps WS/storage plumbing out of the game rules.
+(`addPlayer`, `drawCard`, `discardCard`, `stopTheBus`, …) that take a
+`GameState` and return the next one. The DO owns the only mutable
+instance and handles WebSockets + persistence. This makes the engine
+trivially unit-testable and keeps WS/storage plumbing out of the game
+rules.
