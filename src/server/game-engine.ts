@@ -218,13 +218,18 @@ export function startGame(
   // Flip the top card of the remaining deck onto the discard pile
   const firstDiscard = remaining.shift()!;
 
+  // Randomise the starting player so the host doesn't always go first.
+  const randBuf = new Uint32Array(1);
+  crypto.getRandomValues(randBuf);
+  const startingIndex = randBuf[0] % state.players.length;
+
   return {
     ...state,
     phase: "dealing",
     deck: remaining,
     discardPile: [firstDiscard],
     hands,
-    currentPlayerIndex: 0,
+    currentPlayerIndex: startingIndex,
     turnPhase: "draw",
   };
 }
