@@ -33,11 +33,16 @@ const CARD_WIDTH = 88;
 const CARD_HEIGHT = 124;
 const TARGET_ROW_PX = 358;
 const MIN_STEP = 26;
+// Cap the per-card step so cards always overlap a little — fans look
+// like a hand of cards rather than a row of disconnected tiles. With
+// 3 or 4 cards (the only counts in Thirty-One) this is the active
+// constraint.
+const MAX_STEP = 64;
 
 function stepFor(count: number): number {
   if (count <= 1) return CARD_WIDTH;
   const ideal = (TARGET_ROW_PX - CARD_WIDTH) / (count - 1);
-  return Math.min(CARD_WIDTH, Math.max(MIN_STEP, ideal));
+  return Math.min(MAX_STEP, Math.max(MIN_STEP, ideal));
 }
 
 function pointInRect(

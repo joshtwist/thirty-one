@@ -44,7 +44,7 @@ const SUIT_CLASSES = {
 function CardBack({ size, className }: { size: "sm" | "md" | "lg"; className: string }) {
   return (
     <div
-      className={`${SIZE_CLASSES[size]} relative bg-card-blue border border-card-blue-dark shadow-[0_2px_6px_var(--color-card-shadow)] overflow-hidden ${className}`}
+      className={`${SIZE_CLASSES[size]} relative bg-card-blue border border-card-blue-dark shadow-[0_3px_6px_rgba(0,0,0,0.28),0_8px_18px_rgba(0,0,0,0.22)] overflow-hidden ${className}`}
     >
       {/* Outer inset border */}
       <div className="absolute inset-[3px] rounded-[inherit] border-[1.5px] border-card-blue-light/50">
@@ -83,9 +83,9 @@ function CardFace({
         ${SIZE_CLASSES[size]}
         ${colorClass}
         relative bg-white border border-black/[0.08]
-        shadow-[0_2px_6px_var(--color-card-shadow)]
+        shadow-[0_3px_6px_rgba(0,0,0,0.28),0_8px_18px_rgba(0,0,0,0.22)]
         overflow-hidden
-        ${interactive ? "cursor-pointer hover:shadow-[0_4px_12px_var(--color-card-shadow)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150" : ""}
+        ${interactive ? "cursor-pointer hover:shadow-[0_4px_8px_rgba(0,0,0,0.32),0_12px_24px_rgba(0,0,0,0.28)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150" : ""}
         ${selected ? "ring-2 ring-gold -translate-y-2 shadow-[0_4px_14px_var(--color-card-shadow),0_0_0_2px_var(--color-gold)]" : ""}
         ${className}
       `.trim()}

@@ -51,7 +51,7 @@ export function PlayerBar({
           <div
             key={player.playerId}
             data-testid={`player-bar-${player.name}`}
-            className="flex flex-col items-center gap-1 flex-shrink-0"
+            className="flex flex-col items-center gap-2.5 flex-shrink-0"
           >
             <div className="relative">
               {isActive && (

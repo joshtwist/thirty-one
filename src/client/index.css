@@ -10,6 +10,7 @@
   --color-card-blue-light: #2a4fae;
   --color-card-blue-dark: #152a63;
   --color-card-shadow: rgba(0, 0, 0, 0.22);
+  --color-felt-stopped: #4a2218;
 }
 
 /* Prevent pull-to-refresh and overscroll on mobile */

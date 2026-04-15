@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Hand } from "lucide-react";
 import type { StateMessage, ClientMessage } from "../../shared/protocol.ts";
 import type { Card as CardType } from "../../shared/types.ts";
@@ -103,7 +104,39 @@ export function GameBoard({ state, send }: GameBoardProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-felt min-h-0">
+    <div
+      className={`flex flex-1 flex-col min-h-0 transition-colors duration-500 ${
+        stopper ? "bg-felt-stopped" : "bg-felt"
+      }`}
+    >
+      {/* Stop-the-bus banner — bright red, pulsing, full width.
+          Visible to everyone the moment someone stops, so opponents
+          can't miss it. */}
+      <AnimatePresence>
+        {stopper && (
+          <motion.div
+            data-testid="stop-bus-banner"
+            initial={{ y: -40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -40, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 360, damping: 26 }}
+            className="flex-shrink-0 bg-red-600 text-white text-center py-2 px-4 font-bold text-sm shadow-lg flex items-center justify-center gap-2"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity }}
+            >
+              <Hand className="w-5 h-5" />
+            </motion.div>
+            <span>
+              {stopper.playerId === you.playerId
+                ? "You stopped the bus — last round!"
+                : `${stopper.name} stopped the bus — last round!`}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 1. Opponents */}
       <div className="flex-shrink-0">
         <PlayerBar
